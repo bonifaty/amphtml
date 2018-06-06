@@ -20,8 +20,8 @@
 const EmbedType = {
   POST: 'post',
   POLL: 'poll',
+  PLAYLIST: 'playlist',
 };
-
 
 import {Layout} from '../../../src/layout';
 import {Services} from '../../../src/services';
@@ -63,6 +63,9 @@ export class AmpVk extends AMP.BaseElement {
 
     /** @private {?string} */
     this.pollId_ = null;
+
+    /** @private {?string} */
+    this.playlistId_ = null;
   }
 
   /**
@@ -82,10 +85,16 @@ export class AmpVk extends AMP.BaseElement {
     const createdTime = Date.now().toString(16);
     let iframeSrcPromise;
 
-    if (this.embedType_ === EmbedType.POST) {
-      iframeSrcPromise = this.getVkPostIFrameSrc_();
-    } else if (this.embedType_ === EmbedType.POLL) {
-      iframeSrcPromise = this.getVkPollIFrameSrc_();
+    switch (this.embedType_) {
+      case EmbedType.POST:
+        iframeSrcPromise = this.getVkPostIFrameSrc_();
+        break;
+      case EmbedType.POLL:
+        iframeSrcPromise = this.getVkPollIFrameSrc_();
+        break;
+      case EmbedType.PLAYLIST:
+        iframeSrcPromise = this.getVkPlaylistIFrameSrc_();
+        break;
     }
 
     return iframeSrcPromise.then(iframeSrc => {
@@ -144,6 +153,32 @@ export class AmpVk extends AMP.BaseElement {
     });
   }
 
+  /**
+   * @return {Promise}
+   * @private
+   */
+  getVkPlaylistIFrameSrc_() {
+    return Services.viewerForDoc(this.element).getReferrerUrl().then(ref => {
+      const startWidth = this.element./*OK*/offsetWidth;
+      const pageUrl = this.getAmpDoc().getUrl();
+      const iframeUrl = 'https://vk.com/widget_playlist.php';
+      const queryParams = dict({
+        'oid': this.ownerId_,
+        'pid': this.playlistId_,
+        'hash': this.hash_,
+        'width': '100%',
+        '_ver': '1',
+        'amp': '1',
+        'url': pageUrl,
+        'startWidth': startWidth,
+        'referrer': ref,
+        'title': 'AMP Playlist',
+      });
+
+      return addParamsToUrl(iframeUrl, queryParams);
+    });
+  }
+
   /** @override */
   buildCallback() {
     this.embedType_ = user().assert(this.element.getAttribute('data-embedtype'),
@@ -152,10 +187,16 @@ export class AmpVk extends AMP.BaseElement {
 
     user().assertEnumValue(EmbedType, this.embedType_, 'data-embedtype');
 
-    if (this.embedType_ === EmbedType.POST) {
-      this.postBuildCallback_();
-    } else if (this.embedType_ === EmbedType.POLL) {
-      this.pollBuildCallback_();
+    switch (this.embedType_) {
+      case EmbedType.POST:
+        this.postBuildCallback_();
+        break;
+      case EmbedType.POLL:
+        this.pollBuildCallback_();
+        break;
+      case EmbedType.PLAYLIST:
+        this.playlistBuildCallback_();
+        break;
     }
   }
 
@@ -182,6 +223,22 @@ export class AmpVk extends AMP.BaseElement {
 
     this.pollId_ = user().assert(this.element.getAttribute('data-poll-id'),
         'The data-poll-id attribute is required for <amp-vk> Poll %s',
+        this.element);
+  }
+
+  /** @private */
+  playlistBuildCallback_() {
+    this.ownerId_ = user().assert(this.element.getAttribute('data-owner-id'),
+        'The data-owner-id attribute is required for <amp-vk> Playlist %s',
+        this.element);
+
+    this.playlistId_ =
+      user().assert(this.element.getAttribute('data-playlist-id'),
+          'The data-playlist-id attribute is required for <amp-vk> Playlist %s',
+          this.element);
+
+    this.hash_ = user().assert(this.element.getAttribute('data-hash'),
+        'The data-hash attribute is required for <amp-vk> Playlist %s',
         this.element);
   }
 
